@@ -82,12 +82,46 @@ public class TaskManager {
 
     private static String[][] getTasks(Path path) throws IOException {
         ArrayList<String> array = new ArrayList<>(Files.readAllLines(path)); // IntelliJ suggestion
-        String[][] data = new String[array.size()][];
-        for (int i = 0; i < data.length; i++) {
+        String[][] rawData = new String[array.size()][];
+
+        int counter = 0;
+        for (int i = 0; i < rawData.length; i++) {
             String str = array.get(i);
-            data[i] = str.split(", ");
+            String[] arr = str.split(", ");
+            if ((arr.length >= 3) && (isValidDesc(arr[0])) && (isValidDate(arr[1])) && isValidImportant(arr[2])) {
+                rawData[i] = Arrays.copyOf(arr, 3);
+                counter++;
+            }
         }
-        return data;
+
+        int validatedIndex = 0;
+        String[][] validatedData = new String[counter][];
+        for (String[] record : rawData) {
+            if (record != null) {
+                validatedData[validatedIndex] = record;
+                validatedIndex++;
+            }
+        }
+        return validatedData;
+    }
+
+    private static boolean isValidDesc(String str) {
+        return (!str.contains(","));
+    }
+
+    private static boolean isValidDate(String str) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        dateFormat.setLenient(false);
+        try {
+            dateFormat.parse(str);
+            return true;
+        } catch (ParseException e) {
+            return false;
+        }
+    }
+
+    private static boolean isValidImportant(String str) {
+        return ((str.toLowerCase().equals("true")) || (str.toLowerCase().equals("false")));
     }
 
     private static boolean askToCreateNewFile(Path path) {
@@ -148,6 +182,7 @@ public class TaskManager {
         while (scanner.hasNext()) {
             String date = scanner.nextLine();
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+            dateFormat.setLenient(false);
             try {
                 dateFormat.parse(date);
                 newTask[1] = date;
