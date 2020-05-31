@@ -6,66 +6,58 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
-/*Simple task - very important, 2020-03-09, true
-Second task not so important, 2020-05-10, false
-Throw away trash, 2020-03-09, false*/
-
 public class TaskManager {
 
+    private static String[][] tasks = new String[0][];
+    private static Path path;
+    private static final Scanner scanner = new Scanner(System.in);
+
     public static void main(String[] args) {
-        Path path = null; // file path
-        Scanner scanner = new Scanner(System.in);
-        String[][] tasks = new String[0][]; // array with tasks
+        System.out.println(ConsoleColors.PURPLE + "Task Manager 1.1\n");
+        System.out.println(ConsoleColors.BLUE + "Please type csv file name to open: ");
 
-        // loading data
-
-        System.out.println(ConsoleColors.BLUE + "Task Manager 1.0\nPlease type csv file name to open: ");
-        while (scanner.hasNext()) {
-            String filename = scanner.nextLine();
-            if (isValidFilename(filename)) { // validating filename
+        // loading data from file
+        while (scanner.hasNextLine()) {
+            String filename = scanner.nextLine(); // getting filename
+            if (isValidFilename(filename)) { // validating filename (*.csv)
                 path = Paths.get(filename);
-                if (Files.exists(path)) { // if file exists, trying to get tasks from file
-                    try {
-                        tasks = getTasks(path);
-                        System.out.println(ConsoleColors.GREEN + "File successfully loaded!");
+                if (Files.exists(path)) { // checking if file exists
+                    if (getTasks()) { // trying to get tasks from existing file
                         break;
-                    } catch (IOException e) {
-                        System.out.println(ConsoleColors.RED + "I/O error, try again.");
                     }
                 } else {
-                    if (askToCreateNewFile(path)) { // if file doesn't exist, asking if user wants to create new file
+                    if (askToCreateNewFile()) { // asking if user wants to create new file
                         break;
                     }
                 }
             }
-            System.out.println(ConsoleColors.YELLOW + "Please type proper csv file name to open: ");
+            System.out.println(ConsoleColors.BLUE + "Please type csv file name to open: ");
         }
 
-        // main program
-
-        printOptions();
-        while (scanner.hasNext()) {
+        // managing tasks
+        printOptions(); // printing available options
+        while (scanner.hasNextLine()) {
             String input = scanner.nextLine().toLowerCase();
             switch (input) {
                 case "add":
-                    tasks = addTask(tasks);
+                    addTask(); // adding taks
                     break;
                 case "remove":
-                    tasks = removeTask(tasks);
+                    removeTask(); // removing task
                     break;
                 case "list":
-                    list(tasks);
+                    listTasks(); // listing all taksk
                     break;
                 case "exit":
-                    if (saveTasks(tasks, path)) { // trying to save file
+                    if (saveTasks()) { // trying to save tasks to file
                         scanner.close();
-                        System.exit(0); // quit
+                        System.exit(0); // quitting
                     } else {
                         break;
                     }
@@ -77,68 +69,86 @@ public class TaskManager {
     }
 
     private static boolean isValidFilename(String filename) {
-        return (filename.matches(".+.csv"));
-    }
-
-    private static String[][] getTasks(Path path) throws IOException {
-        ArrayList<String> array = new ArrayList<>(Files.readAllLines(path)); // IntelliJ suggestion
-        String[][] rawData = new String[array.size()][];
-
-        int counter = 0;
-        for (int i = 0; i < rawData.length; i++) {
-            String str = array.get(i);
-            String[] arr = str.split(", ");
-            if ((arr.length >= 3) && (isValidDesc(arr[0])) && (isValidDate(arr[1])) && isValidImportant(arr[2])) {
-                rawData[i] = Arrays.copyOf(arr, 3);
-                counter++;
-            }
-        }
-
-        int validatedIndex = 0;
-        String[][] validatedData = new String[counter][];
-        for (String[] record : rawData) {
-            if (record != null) {
-                validatedData[validatedIndex] = record;
-                validatedIndex++;
-            }
-        }
-        return validatedData;
-    }
-
-    private static boolean isValidDesc(String str) {
-        return (!str.contains(","));
-    }
-
-    private static boolean isValidDate(String str) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        dateFormat.setLenient(false);
-        try {
-            dateFormat.parse(str);
+        if (filename.matches(".+.csv")) {
             return true;
-        } catch (ParseException e) {
+        } else {
+            System.out.println(ConsoleColors.RED + "Filename is invalid!");
             return false;
         }
     }
 
-    private static boolean isValidImportant(String str) {
+    private static boolean getTasks() {
+        // reading lines from file into ArrayList
+        ArrayList<String> taskList = new ArrayList<>();
+        try {
+            for (String line : Files.readAllLines(path)) {
+                taskList.add(line);
+            }
+        } catch (IOException e) {
+            System.out.println(ConsoleColors.RED + "I/O error, try again.");
+            return false;
+        }
+
+        // validating imported lines
+        int validTasksCounter = 0;
+        for (int i = 0; i < taskList.size(); i++) {
+            String task = taskList.get(i).replaceAll("\"\"", "\"").replaceAll("\",\"", ","); // parsing line (changing "" into " and "," into ')
+            String[] taskArray = task.split(",");
+            int length = taskArray.length;
+            if ((length >= 3) && (isValidDate(taskArray[length - 2])) && isBoolean(taskArray[length - 1])) { // validating data
+                String[] validTask = new String[3]; // creating array with valid task data
+                StringBuilder stringBuilder = new StringBuilder();
+                for (int j = 0; j <= length - 3; j++) { // connecting description parts into one string
+                    if (j != length - 3) {
+                        stringBuilder.append(taskArray[j]).append(",");
+                    } else {
+                        stringBuilder.append(taskArray[j]);
+                    }
+                }
+                validTask[0] = stringBuilder.toString(); // adding description
+                validTask[1] = taskArray[length - 2]; // adding data
+                validTask[2] = taskArray[length - 1]; // adding task importance
+                tasks = Arrays.copyOf(tasks, tasks.length + 1);
+                tasks[validTasksCounter] = validTask; // different data storage
+                validTasksCounter++;
+            } else {
+                System.out.println(ConsoleColors.RED + "Error while parsing line" + i + ": " + task + ". Line has invalid data!");
+            }
+        }
+        System.out.println(ConsoleColors.GREEN + "File successfully loaded!");
+        return true;
+    }
+
+    private static boolean isValidDate(String date) {
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE;
+        try {
+            dateTimeFormatter.parse(date);
+        } catch (DateTimeParseException e) {
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isBoolean(String str) {
         return ((str.toLowerCase().equals("true")) || (str.toLowerCase().equals("false")));
     }
 
-    private static boolean askToCreateNewFile(Path path) {
+    private static boolean askToCreateNewFile() {
         System.out.println(ConsoleColors.YELLOW + "File not found! Do you want to create new file: " + path + " (yes/no)?");
-        Scanner scanner = new Scanner(System.in);
-        while (scanner.hasNext()) {
+        while (scanner.hasNextLine()) {
             String input = scanner.nextLine().toLowerCase();
             switch (input) {
                 case "yes":
                     try {
                         Files.createFile(path);
-                        System.out.println(ConsoleColors.GREEN + "File successfully created!");
                     } catch (IOException e) {
                         System.out.println(ConsoleColors.RED + "Unexpected error: can't create new file!");
+                        return false;
                     }
+                    System.out.println(ConsoleColors.GREEN + "File successfully created!");
                     return true;
                 case "no":
+                    System.out.println(ConsoleColors.YELLOW + "File wasn't created.");
                     return false;
                 default:
                     System.out.println(ConsoleColors.YELLOW + "Please select a correct option. Do you want to create new file: " + path + " (yes/no)?");
@@ -152,104 +162,107 @@ public class TaskManager {
         System.out.println(ConsoleColors.RESET + "add\nremove\nlist\nexit");
     }
 
-    private static void list(String[][] tasks) {
+    private static void listTasks() {
         if (tasks.length == 0) {
             System.out.println(ConsoleColors.YELLOW + "Task list is empty! Please add new task.");
-            return;
-        }
-        for (int i = 0; i < tasks.length; i++) {
-            System.out.println(i + " : " + tasks[i][0] + " " + tasks[i][1] + " " + tasks[i][2]);
+        } else {
+            for (int i = 0; i < tasks.length; i++) {
+                System.out.println(i + " : " + tasks[i][0] + " " + tasks[i][1] + " " + tasks[i][2]);
+            }
         }
     }
 
-    private static String[][] addTask(String[][] tasks) {
+    private static void addTask() {
         tasks = Arrays.copyOf(tasks, tasks.length + 1);
         String[] newTask = new String[3];
-        Scanner scanner = new Scanner(System.in);
 
-        System.out.println("Please add task description:");
-        while (scanner.hasNext()) {
-
+        // description
+        System.out.println(ConsoleColors.RESET + "Please add task description:");
+        while (scanner.hasNextLine()) {
             String desc = scanner.nextLine();
-            if (!desc.contains(",")) {
+            if (!desc.matches("\\s*")) {
                 newTask[0] = desc;
                 break;
+            } else {
+                System.out.println(ConsoleColors.YELLOW + "Please add taks description!");
             }
-            System.out.println(ConsoleColors.YELLOW + "Please add proper task description (without comma):");
         }
 
+        // date
         System.out.println(ConsoleColors.RESET + "Please add task due date:");
-        while (scanner.hasNext()) {
+        while (scanner.hasNextLine()) {
             String date = scanner.nextLine();
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            dateFormat.setLenient(false);
-            try {
-                dateFormat.parse(date);
+            if (isValidDate(date)) {
                 newTask[1] = date;
                 break;
-            } catch (ParseException e) {
+            } else {
                 System.out.println(ConsoleColors.YELLOW + "Please add proper task due date (YYYY-MM-DD):");
             }
         }
 
+        // true/false
         System.out.println(ConsoleColors.RESET + "Is your task important:");
-        while (scanner.hasNext()) {
-            String str = scanner.nextLine().toLowerCase();
-            if ((str.equals("true")) || str.equals("false")) {
+        while (scanner.hasNextLine()) {
+            String str = scanner.nextLine();
+            if (isBoolean(str)) {
                 newTask[2] = str;
                 break;
             }
             System.out.println(ConsoleColors.YELLOW + "Is your task important (true/false):");
         }
 
+        // adding new task to tasks list
         tasks[tasks.length - 1] = newTask;
         System.out.println(ConsoleColors.GREEN + "Task was successfully added.");
-        return tasks;
     }
 
-    private static String[][] removeTask(String[][] tasks) {
+    private static void removeTask() {
         if (tasks.length == 0) {
             System.out.println(ConsoleColors.YELLOW + "Task list is empty! Please add new task.");
-            return tasks;
-        }
-
-        Scanner scanner = new Scanner(System.in);
-        int index = 0;
-        System.out.println("Please select task's number to remove.");
-
-        while (scanner.hasNext()) {
-            String str = scanner.nextLine();
-            try {
-                index = Integer.parseInt(str);
-                int length = tasks.length;
-                if ((index >= 0) && (index < length)) {
-                    break;
-                } else {
-                    System.out.print(ConsoleColors.YELLOW + "Please select proper task's number to remove (");
-                    System.out.println((length != 1) ? ("0 - " + (length - 1) + "):") : "0):");
+        } else if (tasks.length == 1) {
+            tasks = null;
+            System.out.println(ConsoleColors.GREEN + "Task 0 was successfully deleted.");
+        } else {
+            System.out.println(ConsoleColors.RESET + "Please select task's number to remove.");
+            int index = 0;
+            while (scanner.hasNextLine()) {
+                String str = scanner.nextLine();
+                try {
+                    index = Integer.parseInt(str);
+                    if ((index >= 0) && (index < tasks.length)) {
+                        break;
+                    } else {
+                        System.out.println(ConsoleColors.YELLOW + "Please select proper task's number to remove! (0-" + (tasks.length - 1) + ")");
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.print(ConsoleColors.YELLOW + "Please select proper task's number to remove!");
                 }
-            } catch (NumberFormatException e) {
-                System.out.println(ConsoleColors.YELLOW + "Please select proper task's number to remove.");
+            }
+            tasks = ArrayUtils.remove(tasks, index);
+            System.out.println(ConsoleColors.GREEN + "Task " + index + " was successfully deleted.");
+        }
+    }
+
+    private static boolean saveTasks() {
+        ArrayList<String> taskList = new ArrayList<>();
+
+        // parsing tasks into lines
+        if (tasks != null) {
+            for (String[] task : tasks) {
+                String desc = task[0].replaceAll(",", "\",\"").replaceAll("\"", "\"\"");
+                String parsedLine = desc + "," + task[1] + "," + task[2];
+                taskList.add(parsedLine);
             }
         }
 
-        tasks = ArrayUtils.remove(tasks, index);
-        System.out.println(ConsoleColors.GREEN + "Task " + index + " was successfully deleted.");
-        return tasks;
-    }
-
-    private static boolean saveTasks(String[][] tasks, Path path) {
-        ArrayList<String> data = new ArrayList<>();
-        for (String[] task : tasks) {
-            data.add(task[0] + ", " + task[1] + ", " + task[2]);
-        }
+        //saving parsed lines to file
         try {
-            Files.write(path, data);
-            System.out.println(ConsoleColors.GREEN + "File successfully saved! See you soon! :)");
-            return true;
+            Files.write(path, taskList);
         } catch (IOException e) {
-            System.out.println(ConsoleColors.RED + "Unexpected error: can't save tasks to file! :(");
+            System.out.println(ConsoleColors.RED + "Unexpected error: can't save tasks to file!");
             return false;
         }
+        System.out.println(ConsoleColors.GREEN + "File successfully saved! See you soon! :)");
+        return true;
     }
 }
