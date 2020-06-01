@@ -52,7 +52,7 @@ public class TaskManager {
                     removeTask(); // removing task
                     break;
                 case "list":
-                    listTasks(); // listing all taksk
+                    listTasks(); // listing all tasks
                     break;
                 case "exit":
                     if (saveTasks()) { // trying to save tasks to file
@@ -79,11 +79,9 @@ public class TaskManager {
 
     private static boolean getTasks() {
         // reading lines from file into ArrayList
-        ArrayList<String> taskList = new ArrayList<>();
+        ArrayList<String> taskList;
         try {
-            for (String line : Files.readAllLines(path)) {
-                taskList.add(line);
-            }
+            taskList = new ArrayList<>(Files.readAllLines(path));
         } catch (IOException e) {
             System.out.println(ConsoleColors.RED + "I/O error, try again.");
             return false;
@@ -137,6 +135,7 @@ public class TaskManager {
         System.out.println(ConsoleColors.YELLOW + "File not found! Do you want to create new file: " + path + " (yes/no)?");
         while (scanner.hasNextLine()) {
             String input = scanner.nextLine().toLowerCase();
+            //noinspection EnhancedSwitchMigration
             switch (input) {
                 case "yes":
                     try {
@@ -220,7 +219,7 @@ public class TaskManager {
         if (tasks.length == 0) {
             System.out.println(ConsoleColors.YELLOW + "Task list is empty! Please add new task.");
         } else if (tasks.length == 1) {
-            tasks = null;
+            tasks = new String[0][];
             System.out.println(ConsoleColors.GREEN + "Task 0 was successfully deleted.");
         } else {
             System.out.println(ConsoleColors.RESET + "Please select task's number to remove.");
@@ -247,12 +246,10 @@ public class TaskManager {
         ArrayList<String> taskList = new ArrayList<>();
 
         // parsing tasks into lines
-        if (tasks != null) {
-            for (String[] task : tasks) {
-                String desc = task[0].replaceAll(",", "\",\"").replaceAll("\"", "\"\"");
-                String parsedLine = desc + "," + task[1] + "," + task[2];
-                taskList.add(parsedLine);
-            }
+        for (String[] task : tasks) {
+            String desc = task[0].replaceAll(",", "\",\"").replaceAll("\"", "\"\"");
+            String parsedLine = desc + "," + task[1] + "," + task[2];
+            taskList.add(parsedLine);
         }
 
         //saving parsed lines to file
