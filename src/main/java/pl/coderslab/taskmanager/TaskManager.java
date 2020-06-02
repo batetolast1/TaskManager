@@ -5,7 +5,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -26,7 +25,7 @@ public class TaskManager {
         while (scanner.hasNextLine()) {
             String filename = scanner.nextLine(); // getting filename
             if (isValidFilename(filename)) { // validating filename (*.csv)
-                path = Paths.get(filename);
+                path = Path.of(filename);
                 if (Files.exists(path)) { // checking if file exists
                     if (getTasks()) { // trying to get tasks from existing file
                         break;
